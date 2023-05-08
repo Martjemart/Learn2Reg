@@ -1,3 +1,5 @@
 simpleITK
 numpy
 tqdm
+pandas
+matplotlib
