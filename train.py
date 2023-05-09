@@ -83,7 +83,7 @@ def train_lvl1():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    model_dir = '../Model/Stage'
+    model_dir = 'Model\Stage'
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
