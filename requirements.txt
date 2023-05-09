@@ -3,3 +3,6 @@ numpy
 tqdm
 pandas
 matplotlib
+torch
+torch.utils
+nibabel
