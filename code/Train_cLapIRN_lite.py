@@ -3,13 +3,15 @@ import os
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
+from sklearn.preprocessing import normalize
+import torch.nn.functional as F
 
 import numpy as np
 import torch
 import torch.utils.data as Data
 import multiprocessing
 
-from Functions import generate_grid, Dataset_epoch, Dataset_epoch_validation, transform_unit_flow_to_flow_cuda, \
+from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, transform_unit_flow_to_flow_cuda, \
     generate_grid_unit
 from miccai2021_model_lite import Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1, \
     Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl2, Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl3, \
@@ -29,7 +31,7 @@ parser.add_argument("--iteration_lvl3", type=int,
                     dest="iteration_lvl3", default=60001,
                     help="number of lvl3 iterations")
 parser.add_argument("--antifold", type=float,
-                    dest="antifold", default=0.,
+                    dest="antifold", default=1.,
                     help="Anti-fold loss: suggested range 1 to 10000")
 parser.add_argument("--checkpoint", type=int,
                     dest="checkpoint", default=3000,
@@ -92,6 +94,7 @@ def train_lvl1():
 
     # OASIS
     names = sorted(glob.glob(datapath +'/imagesTr'+ '/*.nii.gz'))
+    #names = sorted(glob.glob(datapath +'/keypointsTr'+ '/*.csv'))
 
     grid_4 = generate_grid(imgshape_4)
     grid_4 = torch.from_numpy(np.reshape(grid_4, (1,) + grid_4.shape)).cuda().float()
@@ -108,7 +111,7 @@ def train_lvl1():
 
     lossall = np.zeros((4, iteration_lvl1 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -121,7 +124,7 @@ def train_lvl1():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl1:
-        for X, Y in training_generator:
+        for X, key_x, Y, key_y in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -141,6 +144,13 @@ def train_lvl1():
             norm_vector[0, 1, 0, 0, 0] = (y - 1)
             norm_vector[0, 2, 0, 0, 0] = (x - 1)
             loss_regulation = loss_smooth(F_X_Y * norm_vector)
+
+            trans1 = F.grid_sample(key_y.to(F_X_Y.device), F_X_Y.permute(0, 2, 3, 4, 1), align_corners=True)
+            dissimilarity = torch.norm(trans1- key_x.to(F_X_Y.device), p=2)
+            print(trans1)
+            print(key_x)
+
+
 
             smo_weight = reg_code * max_smooth
             loss = loss_multiNCC + antifold * loss_Jacobian + smo_weight * loss_regulation
@@ -330,7 +340,7 @@ def train_lvl3():
 
     lossall = np.zeros((3, iteration_lvl3 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -343,7 +353,7 @@ def train_lvl3():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
-        for X, Y in training_generator:
+        for X, key_x, Y, key_y in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -359,6 +369,12 @@ def train_lvl3():
             norm_vector[0, 1, 0, 0, 0] = (y - 1)
             norm_vector[0, 2, 0, 0, 0] = (x - 1)
             loss_regulation = loss_smooth(F_X_Y * norm_vector)
+
+            print(x, y, z)
+            print(key_x.shape)
+            print(F_X_Y[0, :, key_x[0, 0, 0],key_x[0, 0, 1], key_x[0, 0, 2]])
+            print(key_y[0,0])
+
 
             smo_weight = reg_code * max_smooth
             loss = loss_multiNCC + smo_weight * loss_regulation
