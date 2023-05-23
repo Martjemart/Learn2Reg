@@ -11,8 +11,8 @@ import torch
 import torch.utils.data as Data
 import multiprocessing
 
-from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, transform_unit_flow_to_flow_cuda, \
-    generate_grid_unit
+from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, Dataset_epoch_mask, transform_unit_flow_to_flow_cuda, \
+    generate_grid_unit, reshape_mask
 from miccai2021_model_lite import Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1, \
     Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl2, Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl3, \
     SpatialTransform_unit, SpatialTransformNearest_unit, smoothloss, \
@@ -41,7 +41,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='C:/Users/Jelle/Documents/GitHub/NLST',
+                    default='D:/ismi_data/NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -111,7 +111,7 @@ def train_lvl1():
 
     lossall = np.zeros((4, iteration_lvl1 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -124,7 +124,7 @@ def train_lvl1():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl1:
-        for X, key_x, Y, key_y in training_generator:
+        for X, mask_0, Y, mask_1 in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -132,7 +132,10 @@ def train_lvl1():
 
             F_X_Y, X_Y, Y_4x, F_xy, _ = model(X, Y, reg_code)
 
-            loss_multiNCC = loss_similarity(X_Y, Y_4x)
+            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
+            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+
+            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
 

@@ -532,7 +532,7 @@ class NCC(torch.nn.Module):
         self.eps = eps
         self.w_temp = win
 
-    def forward(self, I, J):
+    def forward(self, I, J, mask_i, mask_j):
         ndims = 3
         win_size = self.w_temp
 
@@ -550,6 +550,7 @@ class NCC(torch.nn.Module):
         I2 = I*I
         J2 = J*J
         IJ = I*J
+        IJ_mask = (I *mask_i) * (J * mask_j)
 
         # compute filters
         # compute local sums via convolution
@@ -558,6 +559,12 @@ class NCC(torch.nn.Module):
         I2_sum = conv_fn(I2, weight, padding=int(win_size/2))
         J2_sum = conv_fn(J2, weight, padding=int(win_size/2))
         IJ_sum = conv_fn(IJ, weight, padding=int(win_size/2))
+
+        I_mask = I_sum * mask_i
+        J_mask = J_sum * mask_j
+        I2_sum_mask = conv_fn(I2, weight, padding=int(win_size/2))* mask_i
+        J2_sum_mask = conv_fn(J2, weight, padding=int(win_size/2))* mask_j
+        IJ_sum_mask = conv_fn(IJ_mask, weight, padding=int(win_size/2))
 
         # compute cross correlation
         win_size = np.prod(self.win)
@@ -568,10 +575,20 @@ class NCC(torch.nn.Module):
         I_var = I2_sum - 2 * u_I * I_sum + u_I*u_I*win_size
         J_var = J2_sum - 2 * u_J * J_sum + u_J*u_J*win_size
 
+        # compute cross correlation
+        win_size = np.prod(self.win)
+        u_I_mask = I_mask/win_size
+        u_J_mask = J_mask/win_size
+
+        cross_msk = IJ_sum_mask - u_J_mask*I_mask - u_I_mask*J_mask + u_I_mask*u_J_mask*win_size
+        I_var_msk = I2_sum_mask - 2 * u_I_mask * I_mask + u_I_mask*u_I_mask*win_size
+        J_var_msk = J2_sum_mask - 2 * u_J_mask * J_mask+ u_J_mask*u_J_mask*win_size
+
         cc = cross * cross / (I_var * J_var + self.eps)
+        cc_mask = cross_msk * cross_msk / (I_var_msk * J_var_msk + self.eps)
 
         # return negative cc.
-        return -1.0 * torch.mean(cc)
+        return -1.0 * torch.mean(cc+cc_mask*2)
 
 
 class multi_resolution_NCC(torch.nn.Module):
