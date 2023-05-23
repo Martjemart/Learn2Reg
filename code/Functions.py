@@ -1,9 +1,10 @@
 import itertools
-
+import csv
 import nibabel as nib
 import numpy as np
 import torch
 import torch.utils.data as Data
+import torch.nn.functional as F
 
 
 def generate_grid(imgshape):
@@ -51,6 +52,25 @@ def transform_unit_flow_to_flow_cuda(flow):
 
     return flow
 
+def reshape_mask(mask, devider):
+    original_shape = mask.shape
+    mask_devided = (224 / devider, 192 / devider, 224 / devider)
+    # Reshape the mask to (batch_size, channels, height * width, depth)
+    mask_reshaped = mask.view(original_shape[0], original_shape[1], -1, original_shape[3])
+
+    # Perform downsampling using average pooling
+    downsampled_mask = F.avg_pool2d(mask_reshaped, kernel_size=8, stride=8)
+
+    threshold = 0.5
+    downsampled_mask = torch.where(downsampled_mask > threshold, torch.tensor(1.0), torch.tensor(0.0))
+
+    new_shape = (original_shape[0], original_shape[1], mask_devided[0], mask_devided[1], mask_devided[2])
+    new_shape = tuple(int(dim) for dim in new_shape)  # Convert dimensions to integers
+    final_mask = downsampled_mask.view(*new_shape)
+
+    return final_mask
+
+
 def load_4D(name):
     # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
     # X = np.reshape(X, (1,)+ X.shape)
@@ -58,6 +78,24 @@ def load_4D(name):
     X = X.get_fdata()
     X = np.reshape(X, (1,) + X.shape)
     return X
+
+def load_key(name):
+    keypoints = []
+    with open(name, 'r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            keypoint = [float(val) for val in row]
+            keypoints.append(keypoint)
+    return np.array(keypoints)
+
+def load_key_x(name):
+    keypoints = []
+    with open(name, 'r') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            keypoint = [int(float(val)) for val in row]
+            keypoints.append(keypoint)
+    return np.array(keypoints)
 
 def load_4D_with_header(name):
     # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
@@ -174,6 +212,103 @@ class Dataset_epoch(Data.Dataset):
             return torch.from_numpy(imgnorm(img_A)).float(), torch.from_numpy(imgnorm(img_B)).float()
         else:
             return torch.from_numpy(img_A).float(), torch.from_numpy(img_B).float()
+
+class Dataset_epoch_mask(Data.Dataset):
+  'Characterizes a dataset for PyTorch'
+  def __init__(self, names, norm=False):
+        'Initialization'
+        super(Dataset_epoch_mask, self).__init__()
+
+        self.names = names
+        self.norm = norm
+        self.index_pair = self.generate_pairs()
+
+  def generate_pairs(self):
+    pairs = []
+    unique_subjects = set()
+    for name in self.names:
+        subject_number = name.split('/')[-1].split('_')[1]
+        if subject_number not in unique_subjects:
+            unique_subjects.add(subject_number)
+            image_0 = name
+            image_1 = name.replace('_0000', '_0001')
+            mask_0 = image_0.replace('imagesTr', 'masksTr')
+
+            mask_1 = image_1.replace('imagesTr', 'masksTr')
+
+
+            pair = (image_0, mask_0, image_1, mask_1)
+            pairs.append(pair)
+
+    return pairs
+
+
+  def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.index_pair)
+
+  def __getitem__(self, step):
+        'Generates one sample of data'
+        # Select sample
+        img_A = load_4D(self.index_pair[step][0])
+        img_B = load_4D(self.index_pair[step][2])
+
+        mask_A = load_4D(self.index_pair[step][1])
+        mask_B = load_4D(self.index_pair[step][3])
+        if self.norm:
+            return torch.from_numpy(imgnorm(img_A)).float(), mask_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B
+        else:
+            return torch.from_numpy(img_A).float(), mask_A, torch.from_numpy(img_B).float(), mask_B
+
+
+class Dataset_epoch_lvl3(Data.Dataset):
+  'Characterizes a dataset for PyTorch'
+  def __init__(self, names, norm=False):
+        'Initialization'
+        super(Dataset_epoch_lvl3, self).__init__()
+
+        self.names = names
+        self.norm = norm
+        #self.keynames = keynames
+        self.index_pair = self.generate_pairs()
+
+  def generate_pairs(self):
+    pairs = []
+    unique_subjects = set()
+    for i, name in enumerate(self.names):
+        subject_number = name.split('/')[-1].split('_')[1]
+        if subject_number not in unique_subjects:
+            unique_subjects.add(subject_number)
+            image_0 = name
+            image_1 = name.replace('_0000', '_0001')
+
+            key_0 = image_0.replace('imagesTr', 'keypointsTr')
+            key_0 = key_0.replace('nii.gz', 'csv')
+            key_1 = image_1.replace('imagesTr', 'keypointsTr')
+            key_1 = key_1.replace('nii.gz', 'csv')
+
+            pair = (image_0, key_0, image_1, key_1)
+            pairs.append(pair)
+    return pairs
+
+
+  def __len__(self):
+        'Denotes the total number of samples'
+        return len(self.index_pair)
+
+  def __getitem__(self, step):
+        'Generates one sample of data'
+        # Select sample
+        img_A = load_4D(self.index_pair[step][0])
+        img_B = load_4D(self.index_pair[step][2])
+        
+        key_A = load_key_x(self.index_pair[step][1])
+        key_B = load_key(self.index_pair[step][3])
+
+        if self.norm:
+            return torch.from_numpy(imgnorm(img_A)).float(), key_A, torch.from_numpy(imgnorm(img_B)).float(), key_B
+        else:
+            return torch.from_numpy(img_A).float(), key_A, torch.from_numpy(img_B).float(), key_B
 
 
 class Dataset_epoch_validation(Data.Dataset):

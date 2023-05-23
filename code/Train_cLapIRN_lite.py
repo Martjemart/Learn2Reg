@@ -3,14 +3,16 @@ import os
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
+from sklearn.preprocessing import normalize
+import torch.nn.functional as F
 
 import numpy as np
 import torch
 import torch.utils.data as Data
 import multiprocessing
 
-from Functions import generate_grid, Dataset_epoch, Dataset_epoch_validation, transform_unit_flow_to_flow_cuda, \
-    generate_grid_unit
+from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, Dataset_epoch_mask, transform_unit_flow_to_flow_cuda, \
+    generate_grid_unit, reshape_mask
 from miccai2021_model_lite import Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1, \
     Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl2, Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl3, \
     SpatialTransform_unit, SpatialTransformNearest_unit, smoothloss, \
@@ -20,19 +22,19 @@ parser = ArgumentParser()
 parser.add_argument("--lr", type=float,
                     dest="lr", default=1e-4, help="learning rate")
 parser.add_argument("--iteration_lvl1", type=int,
-                    dest="iteration_lvl1", default=30001,
+                    dest="iteration_lvl1", default=11,
                     help="number of lvl1 iterations")
 parser.add_argument("--iteration_lvl2", type=int,
-                    dest="iteration_lvl2", default=30001,
+                    dest="iteration_lvl2", default=11,
                     help="number of lvl2 iterations")
 parser.add_argument("--iteration_lvl3", type=int,
                     dest="iteration_lvl3", default=60001,
                     help="number of lvl3 iterations")
 parser.add_argument("--antifold", type=float,
-                    dest="antifold", default=0.,
+                    dest="antifold", default=1.,
                     help="Anti-fold loss: suggested range 1 to 10000")
 parser.add_argument("--checkpoint", type=int,
-                    dest="checkpoint", default=3000,
+                    dest="checkpoint", default=10,
                     help="frequency of saving models")
 parser.add_argument("--start_channel", type=int,
                     dest="start_channel", default=4,  # default:8, 7 for stage
@@ -92,6 +94,7 @@ def train_lvl1():
 
     # OASIS
     names = sorted(glob.glob(datapath +'/imagesTr'+ '/*.nii.gz'))
+    #names = sorted(glob.glob(datapath +'/keypointsTr'+ '/*.csv'))
 
     grid_4 = generate_grid(imgshape_4)
     grid_4 = torch.from_numpy(np.reshape(grid_4, (1,) + grid_4.shape)).cuda().float()
@@ -108,7 +111,7 @@ def train_lvl1():
 
     lossall = np.zeros((4, iteration_lvl1 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -121,7 +124,7 @@ def train_lvl1():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl1:
-        for X, Y in training_generator:
+        for X, mask_0, Y, mask_1 in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -129,7 +132,10 @@ def train_lvl1():
 
             F_X_Y, X_Y, Y_4x, F_xy, _ = model(X, Y, reg_code)
 
-            loss_multiNCC = loss_similarity(X_Y, Y_4x)
+            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
+            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+
+            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
 
@@ -177,7 +183,7 @@ def train_lvl2():
                                                                          imgshape=imgshape_4,
                                                                          range_flow=range_flow).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_?????.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
     model_lvl1.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl1...", model_path)
 
@@ -290,7 +296,7 @@ def train_lvl3():
                                                                          range_flow=range_flow,
                                                                          model_lvl1=model_lvl1).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_?????.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
     model_lvl2.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl2...", model_path)
 
@@ -330,7 +336,7 @@ def train_lvl3():
 
     lossall = np.zeros((3, iteration_lvl3 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -343,7 +349,7 @@ def train_lvl3():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
-        for X, Y in training_generator:
+        for X, key_x, Y, key_y in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -360,8 +366,38 @@ def train_lvl3():
             norm_vector[0, 2, 0, 0, 0] = (x - 1)
             loss_regulation = loss_smooth(F_X_Y * norm_vector)
 
+            # Assuming F_X_Y is a deformation field and key_y is a set of coordinates in the 'Y' space
+            # Normalize F_X_Y to be between -1 and 1 (assuming it's not already normalized)
+            norm_tensor = torch.tensor([F_X_Y.shape[-1] / 2, F_X_Y.shape[-2] / 2, F_X_Y.shape[-3] / 2])
+            norm_tensor = norm_tensor.view(1, 3, 1, 1, 1).to(F_X_Y.device)
+            F_X_Y_normalized = F_X_Y / norm_tensor
+            F_X_Y_normalized = F_X_Y_normalized.permute(0, 2, 3, 4, 1)
+            F_X_Y_normalized = F_X_Y_normalized.float()
+
+           # Normalize key_y to [-1, 1] according to the size of the feature map
+            key_y_normalized = key_y / torch.tensor([[x / 2, y / 2, z / 2]], dtype=key_y.dtype, device=key_y.device) - 1
+            key_y_expanded = key_y_normalized.unsqueeze(0).unsqueeze(2).to(F_X_Y.device).float()
+
+            # Now key_y_expanded is a 5D tensor where the last dimension is 3 (for the 3D coordinates), 
+            # and the rest of the dimensions match the expected input of grid_sample:
+            # [minibatch, channels=1, depth=1, height=1, width=num_keypoints]
+
+            # Apply the deformation field to key_y
+            key_x_predicted = torch.nn.functional.grid_sample(key_y_expanded, F_X_Y_normalized)
+
+            # key_x_predicted is now a 5D tensor of shape [minibatch, channels=1, depth=1, height=1, width=num_keypoints].
+            # We can remove the singleton dimensions to match the shape of key_x:
+            key_x_predicted = key_x_predicted.squeeze(1).squeeze(2).squeeze(2)
+
+            # Now we have key_x_predicted and key_x of the same shape, 
+            # and we can compute the Euclidean distance between them for the keypoint loss:
+            keypoint_loss = torch.norm(key_x_predicted - key_x, dim=-1).mean()
+
+            keypoint_loss_weight = 0.7
+
+            # Add keypoint_loss to the existing loss with a suitable weight
             smo_weight = reg_code * max_smooth
-            loss = loss_multiNCC + smo_weight * loss_regulation
+            loss = loss_multiNCC + smo_weight * loss_regulation + keypoint_loss_weight * keypoint_loss
 
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
