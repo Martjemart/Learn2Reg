@@ -20,26 +20,26 @@ parser = ArgumentParser()
 parser.add_argument("--lr", type=float,
                     dest="lr", default=1e-4, help="learning rate")
 parser.add_argument("--iteration_lvl1", type=int,
-                    dest="iteration_lvl1", default=30001,
+                    dest="iteration_lvl1", default=3,
                     help="number of lvl1 iterations")
 parser.add_argument("--iteration_lvl2", type=int,
-                    dest="iteration_lvl2", default=30001,
+                    dest="iteration_lvl2", default=3,
                     help="number of lvl2 iterations")
 parser.add_argument("--iteration_lvl3", type=int,
-                    dest="iteration_lvl3", default=60001,
+                    dest="iteration_lvl3", default=3,
                     help="number of lvl3 iterations")
 parser.add_argument("--antifold", type=float,
                     dest="antifold", default=0.,
                     help="Anti-fold loss: suggested range 1 to 10000")
 parser.add_argument("--checkpoint", type=int,
-                    dest="checkpoint", default=3000,
+                    dest="checkpoint", default=2,
                     help="frequency of saving models")
 parser.add_argument("--start_channel", type=int,
                     dest="start_channel", default=4,  # default:8, 7 for stage
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='D:/ismi_data/NLST',
+                    default='NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -177,7 +177,7 @@ def train_lvl2():
                                                                          imgshape=imgshape_4,
                                                                          range_flow=range_flow).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_?????.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_?.pth"))[-1]
     model_lvl1.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl1...", model_path)
 
@@ -290,7 +290,7 @@ def train_lvl3():
                                                                          range_flow=range_flow,
                                                                          model_lvl1=model_lvl1).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_?????.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_?.pth"))[-1]
     model_lvl2.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl2...", model_path)
 
