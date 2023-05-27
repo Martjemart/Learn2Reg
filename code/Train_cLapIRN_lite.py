@@ -12,7 +12,7 @@ import torch.utils.data as Data
 import multiprocessing
 
 from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, Dataset_epoch_mask, transform_unit_flow_to_flow_cuda, \
-    generate_grid_unit, reshape_mask
+    generate_grid_unit, reshape_mask, res_mask_2, res_mask_4
 from miccai2021_model_lite import Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1, \
     Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl2, Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl3, \
     SpatialTransform_unit, SpatialTransformNearest_unit, smoothloss, \
@@ -41,7 +41,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='NLST',
+                    default='D:/ismi_data/NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -132,8 +132,9 @@ def train_lvl1():
 
             F_X_Y, X_Y, Y_4x, F_xy, _ = model(X, Y, reg_code)
 
-            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
-            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+            mask_0_re = res_mask_4(mask_0).to(F_X_Y.device)
+            mask_1_re = res_mask_4(mask_1).to(F_X_Y.device)
+
 
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
@@ -241,8 +242,9 @@ def train_lvl2():
 
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, _ = model(X, Y, reg_code)
 
-            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
-            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+            mask_0_re = res_mask_2(mask_0).to(F_X_Y.device)
+            mask_1_re = res_mask_2(mask_1).to(F_X_Y.device)
+            
 
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
@@ -360,10 +362,7 @@ def train_lvl3():
 
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, F_xy_lvl2, _ = model(X, Y, reg_code)
 
-            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
-            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
-
-            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
+            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0.to(F_X_Y.device), mask_1.to(F_X_Y.device))
 
             
 
