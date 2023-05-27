@@ -564,7 +564,7 @@ class NCC(torch.nn.Module):
         J_mask = J_sum * mask_j
         I2_sum_mask = conv_fn(I2, weight, padding=int(win_size/2))* mask_i
         J2_sum_mask = conv_fn(J2, weight, padding=int(win_size/2))* mask_j
-        IJ_sum_mask = conv_fn(IJ_mask, weight, padding=int(win_size/2))
+        IJ_sum_mask = conv_fn(IJ_mask.float(), weight, padding=int(win_size/2))
 
         # compute cross correlation
         win_size = np.prod(self.win)
@@ -606,7 +606,7 @@ class multi_resolution_NCC(torch.nn.Module):
             self.similarity_metric.append(NCC(win=win - (i*2)))
             # self.similarity_metric.append(Normalized_Gradient_Field(eps=0.01))
 
-    def forward(self, I, J):
+    def forward(self, I, J, mask_i, mask_j):
         total_NCC = []
         # scale_I = I
         # scale_J = J
@@ -621,12 +621,14 @@ class multi_resolution_NCC(torch.nn.Module):
         #     scale_J = nn.functional.interpolate(J, scale_factor=(1.0/(2**(i+1))))
 
         for i in range(self.num_scale):
-            current_NCC = self.similarity_metric[i](I, J)
+            current_NCC = self.similarity_metric[i](I, J, mask_i, mask_j)
             total_NCC.append(current_NCC/(2**i))
             # print(scale_I.size(), scale_J.size())
 
             I = nn.functional.avg_pool3d(I, kernel_size=3, stride=2, padding=1, count_include_pad=False)
             J = nn.functional.avg_pool3d(J, kernel_size=3, stride=2, padding=1, count_include_pad=False)
+            mask_i = nn.functional.avg_pool3d(mask_i, kernel_size=3, stride=2, padding=1, count_include_pad=False).float()
+            mask_j = nn.functional.avg_pool3d(mask_j, kernel_size=3, stride=2, padding=1, count_include_pad=False).float()
 
         return sum(total_NCC)
 

@@ -54,12 +54,15 @@ def transform_unit_flow_to_flow_cuda(flow):
 
 def reshape_mask(mask, devider):
     original_shape = mask.shape
-    mask_devided = (224 / devider, 192 / devider, 224 / devider)
+    mask_devided = (int(224 / devider), int(192 / devider), int(224 / devider))
     # Reshape the mask to (batch_size, channels, height * width, depth)
     mask_reshaped = mask.view(original_shape[0], original_shape[1], -1, original_shape[3])
 
-    # Perform downsampling using average pooling
-    downsampled_mask = F.avg_pool2d(mask_reshaped, kernel_size=8, stride=8)
+
+    # Calculate the stride for each dimension
+
+    # Perform max pooling with the calculated stride
+    downsampled_mask = F.avg_pool2d(mask_reshaped, kernel_size=(2,4))
 
     threshold = 0.5
     downsampled_mask = torch.where(downsampled_mask > threshold, torch.tensor(1.0), torch.tensor(0.0))
@@ -69,6 +72,14 @@ def reshape_mask(mask, devider):
     final_mask = downsampled_mask.view(*new_shape)
 
     return final_mask
+
+def res_mask_2(mask):
+    return F.avg_pool3d(mask, kernel_size=3, stride=2, padding=1, count_include_pad=False)
+    return new_mask
+
+def res_mask_4(mask):
+    return F.avg_pool3d(mask, kernel_size=4, stride=4)
+    
 
 
 def load_4D(name):
