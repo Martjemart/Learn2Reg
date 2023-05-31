@@ -5,3 +5,6 @@ Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan

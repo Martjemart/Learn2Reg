@@ -313,11 +313,11 @@ class Dataset_epoch_lvl3(Data.Dataset):
         img_A = load_4D(self.index_pair[step][0])
         img_B = load_4D(self.index_pair[step][3])
         
-        key_A = load_key_x(self.index_pair[step][1])
-        key_B = load_key(self.index_pair[step][4])
+        key_A = load_key_x(self.index_pair[step][2])
+        key_B = load_key(self.index_pair[step][5])
 
-        mask_A = load_4D(self.index_pair[step][2])
-        mask_B = load_4D(self.index_pair[step][5])
+        mask_A = load_4D(self.index_pair[step][1])
+        mask_B = load_4D(self.index_pair[step][4])
 
         if self.norm:
             return torch.from_numpy(imgnorm(img_A)).float(), mask_A, key_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B, key_B
