@@ -41,7 +41,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='NLST',
+                    default='C:/Users/Jelle/Documents/GitHub/NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -290,6 +290,9 @@ def train_lvl2():
         print("one epoch pass")
     np.save(model_dir + '/loss' + model_name + 'stagelvl2.npy', lossall)
 
+def denormalization(deformation_field):
+    print(deformation_field.shape)
+
 
 def train_lvl3():
     print("Training lvl3...")
@@ -341,7 +344,7 @@ def train_lvl3():
 
     lossall = np.zeros((3, iteration_lvl3 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -354,7 +357,7 @@ def train_lvl3():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
-        for X, mask_0, Y, mask_1 in training_generator:
+        for X, mask_0, key_0, Y, mask_1, key_1 in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -363,8 +366,6 @@ def train_lvl3():
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, F_xy_lvl2, _ = model(X, Y, reg_code)
 
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0.to(F_X_Y.device), mask_1.to(F_X_Y.device))
-
-            
 
             _, _, x, y, z = F_X_Y.shape
             norm_vector = torch.zeros((1, 3, 1, 1, 1), dtype=F_X_Y.dtype, device=F_X_Y.device)
@@ -381,7 +382,9 @@ def train_lvl3():
             F_X_Y_normalized = F_X_Y_normalized.permute(0, 2, 3, 4, 1)
             F_X_Y_normalized = F_X_Y_normalized.float()
 
-           # Normalize key_y to [-1, 1] according to the size of the feature map
+            denormalization(F_X_Y_normalized)
+
+            #Normalize key_y to [-1, 1] according to the size of the feature map
             #key_y_normalized = key_y / torch.tensor([[x / 2, y / 2, z / 2]], dtype=key_y.dtype, device=key_y.device) - 1
             #key_y_expanded = key_y_normalized.unsqueeze(0).unsqueeze(2).to(F_X_Y.device).float()
 
@@ -487,8 +490,8 @@ if __name__ == "__main__":
     range_flow = 0.4
     max_smooth = 10.
     start_t = datetime.now()
-    train_lvl1()
-    train_lvl2()
+    # train_lvl1()
+    # train_lvl2()
     train_lvl3()
     # time
     end_t = datetime.now()

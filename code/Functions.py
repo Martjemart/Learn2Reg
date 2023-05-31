@@ -80,8 +80,6 @@ def res_mask_2(mask):
 def res_mask_4(mask):
     return F.avg_pool3d(mask, kernel_size=4, stride=4)
     
-
-
 def load_4D(name):
     # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
     # X = np.reshape(X, (1,)+ X.shape)
@@ -92,7 +90,7 @@ def load_4D(name):
 
 def load_key(name):
     keypoints = []
-    with open(name, 'r') as file:
+    with open(name, 'r', encoding='utf8') as file:
         reader = csv.reader(file)
         for row in reader:
             keypoint = [float(val) for val in row]
@@ -101,7 +99,7 @@ def load_key(name):
 
 def load_key_x(name):
     keypoints = []
-    with open(name, 'r') as file:
+    with open(name, 'r', encoding='utf8') as file:
         reader = csv.reader(file)
         for row in reader:
             keypoint = [int(float(val)) for val in row]
@@ -270,8 +268,7 @@ class Dataset_epoch_mask(Data.Dataset):
             return torch.from_numpy(imgnorm(img_A)).float(), mask_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B
         else:
             return torch.from_numpy(img_A).float(), mask_A, torch.from_numpy(img_B).float(), mask_B
-
-
+        
 class Dataset_epoch_lvl3(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, names, norm=False):
@@ -298,7 +295,10 @@ class Dataset_epoch_lvl3(Data.Dataset):
             key_1 = image_1.replace('imagesTr', 'keypointsTr')
             key_1 = key_1.replace('nii.gz', 'csv')
 
-            pair = (image_0, key_0, image_1, key_1)
+            mask_0 = image_0.replace('imagesTr', 'masksTr')
+            mask_1 = image_1.replace('imagesTr', 'masksTr')
+
+            pair = (image_0, mask_0, key_0, image_1, mask_1, key_1)
             pairs.append(pair)
     return pairs
 
@@ -311,15 +311,18 @@ class Dataset_epoch_lvl3(Data.Dataset):
         'Generates one sample of data'
         # Select sample
         img_A = load_4D(self.index_pair[step][0])
-        img_B = load_4D(self.index_pair[step][2])
+        img_B = load_4D(self.index_pair[step][3])
         
         key_A = load_key_x(self.index_pair[step][1])
-        key_B = load_key(self.index_pair[step][3])
+        key_B = load_key(self.index_pair[step][4])
+
+        mask_A = load_4D(self.index_pair[step][2])
+        mask_B = load_4D(self.index_pair[step][5])
 
         if self.norm:
-            return torch.from_numpy(imgnorm(img_A)).float(), key_A, torch.from_numpy(imgnorm(img_B)).float(), key_B
+            return torch.from_numpy(imgnorm(img_A)).float(), mask_A, key_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B, key_B
         else:
-            return torch.from_numpy(img_A).float(), key_A, torch.from_numpy(img_B).float(), key_B
+            return torch.from_numpy(img_A).float(), mask_A, key_A, torch.from_numpy(img_B).float(), mask_B, key_B
 
 
 class Dataset_epoch_validation(Data.Dataset):
