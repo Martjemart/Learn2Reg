@@ -12,7 +12,7 @@ import torch.utils.data as Data
 import multiprocessing
 
 from Functions import generate_grid, Dataset_epoch, Dataset_epoch_lvl3, Dataset_epoch_validation, Dataset_epoch_mask, transform_unit_flow_to_flow_cuda, \
-    generate_grid_unit, reshape_mask, res_mask_2, res_mask_4
+    generate_grid_unit, res_mask_2, res_mask_4
 from miccai2021_model_lite import Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1, \
     Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl2, Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl3, \
     SpatialTransform_unit, SpatialTransformNearest_unit, smoothloss, \
@@ -41,7 +41,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='C:/Users/Jelle/Documents/GitHub/NLST',
+                    default='NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -71,11 +71,10 @@ def dice(im1, atlas):
         sub_dice = np.sum(atlas[im1 == i] == i) * 2.0 / (np.sum(im1 == i) + np.sum(atlas == i))
         dice += sub_dice
         num_count += 1
-        # print(sub_dice)
-    # print(num_count, len(unique_class)-1)
+
     return dice / num_count
 
-
+#training first pyramid part
 def train_lvl1():
     print("Training lvl1...")
     model = Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1(2, 3, start_channel, is_train=True,
@@ -92,9 +91,8 @@ def train_lvl1():
         param.requires_grad = False
         param.volatile = True
 
-    # OASIS
+    # NLST
     names = sorted(glob.glob(datapath +'/imagesTr'+ '/*.nii.gz'))
-    #names = sorted(glob.glob(datapath +'/keypointsTr'+ '/*.csv'))
 
     grid_4 = generate_grid(imgshape_4)
     grid_4 = torch.from_numpy(np.reshape(grid_4, (1,) + grid_4.shape)).cuda().float()
@@ -111,6 +109,7 @@ def train_lvl1():
 
     lossall = np.zeros((4, iteration_lvl1 + 1))
 
+    #use mask loader
     training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
@@ -131,11 +130,12 @@ def train_lvl1():
             reg_code = torch.rand(1, dtype=X.dtype, device=X.device).unsqueeze(dim=0)
 
             F_X_Y, X_Y, Y_4x, F_xy, _ = model(X, Y, reg_code)
-
+            
+            #fit mask to img shape
             mask_0_re = res_mask_4(mask_0).to(F_X_Y.device)
             mask_1_re = res_mask_4(mask_1).to(F_X_Y.device)
 
-
+            #calculate loss for total img + masked img
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
@@ -177,14 +177,14 @@ def train_lvl1():
         print("one epoch pass")
     np.save(model_dir + '/loss' + model_name + 'stagelvl1.npy', lossall)
 
-
+#train part two of the pyramid
 def train_lvl2():
     print("Training lvl2...")
     model_lvl1 = Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1(2, 3, start_channel, is_train=True,
                                                                          imgshape=imgshape_4,
                                                                          range_flow=range_flow).cuda()
 
-    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
     model_lvl1.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl1...", model_path)
 
@@ -206,7 +206,7 @@ def train_lvl2():
         param.requires_grad = False
         param.volatile = True
 
-    # OASIS
+    # NLST
     names = sorted(glob.glob(datapath +'/imagesTr'+ '/*.nii.gz'))
 
     grid_2 = generate_grid(imgshape_2)
@@ -214,7 +214,7 @@ def train_lvl2():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    model_dir = './Model/Stage'
+    model_dir = '../Model/Stage'
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
@@ -226,11 +226,11 @@ def train_lvl2():
     step = 0
     load_model = False
     if load_model is True:
-        model_path = "./Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
+        model_path = "../Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
         print("Loading weight: ", model_path)
         step = 3000
         model.load_state_dict(torch.load(model_path))
-        temp_lossall = np.load("./Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
+        temp_lossall = np.load("../Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl2:
@@ -242,10 +242,10 @@ def train_lvl2():
 
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, _ = model(X, Y, reg_code)
 
+            #fit mask to img shape
             mask_0_re = res_mask_2(mask_0).to(F_X_Y.device)
             mask_1_re = res_mask_2(mask_1).to(F_X_Y.device)
-            
-
+            #calculate loss for total img + masked img
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
@@ -290,10 +290,7 @@ def train_lvl2():
         print("one epoch pass")
     np.save(model_dir + '/loss' + model_name + 'stagelvl2.npy', lossall)
 
-def denormalization(deformation_field):
-    print(deformation_field.shape)
-
-
+#train final pyramid part
 def train_lvl3():
     print("Training lvl3...")
     model_lvl1 = Miccai2021_LDR_conditional_laplacian_unit_disp_add_lvl1(2, 3, start_channel, is_train=True,
@@ -304,7 +301,7 @@ def train_lvl3():
                                                                          range_flow=range_flow,
                                                                          model_lvl1=model_lvl1).cuda()
 
-    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
+    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
     model_lvl2.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl2...", model_path)
 
@@ -337,27 +334,27 @@ def train_lvl3():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    model_dir = './Model'
+    model_dir = '../Model'
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
 
     lossall = np.zeros((3, iteration_lvl3 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
     if load_model is True:
-        model_path = "./Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
+        model_path = "../Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
         print("Loading weight: ", model_path)
         step = 3000
         model.load_state_dict(torch.load(model_path))
-        temp_lossall = np.load("./Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
+        temp_lossall = np.load("../Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
-        for X, mask_0, key_0, Y, mask_1, key_1 in training_generator:
+        for X, mask_0, Y, mask_1 in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -365,7 +362,12 @@ def train_lvl3():
 
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, F_xy_lvl2, _ = model(X, Y, reg_code)
 
-            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0.to(F_X_Y.device), mask_1.to(F_X_Y.device))
+            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
+            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+
+            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
+
+            
 
             _, _, x, y, z = F_X_Y.shape
             norm_vector = torch.zeros((1, 3, 1, 1, 1), dtype=F_X_Y.dtype, device=F_X_Y.device)
@@ -382,9 +384,7 @@ def train_lvl3():
             F_X_Y_normalized = F_X_Y_normalized.permute(0, 2, 3, 4, 1)
             F_X_Y_normalized = F_X_Y_normalized.float()
 
-            denormalization(F_X_Y_normalized)
-
-            #Normalize key_y to [-1, 1] according to the size of the feature map
+           # Normalize key_y to [-1, 1] according to the size of the feature map
             #key_y_normalized = key_y / torch.tensor([[x / 2, y / 2, z / 2]], dtype=key_y.dtype, device=key_y.device) - 1
             #key_y_expanded = key_y_normalized.unsqueeze(0).unsqueeze(2).to(F_X_Y.device).float()
 
@@ -431,7 +431,7 @@ def train_lvl3():
 
                 # Put your validation code here
                 # ---------------------------------------
-                # OASIS (Validation)
+                # NLST (Validation)
                 names = sorted(glob.glob(datapath +'/imagesVal'+ '/*.nii.gz'))
 
                 valid_generator = Data.DataLoader(Dataset_epoch(names, norm=True), batch_size=1,
@@ -479,10 +479,10 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
     # Create and initalize log file
-    if not os.path.isdir("./Log"):
-        os.mkdir("./Log")
+    if not os.path.isdir("../Log"):
+        os.mkdir("../Log")
 
-    log_dir = "./Log/" + model_name + ".txt"
+    log_dir = "../Log/" + model_name + ".txt"
 
     with open(log_dir, "a") as log:
         log.write("Validation Dice log for " + model_name[0:-1] + ":\n")
@@ -490,8 +490,8 @@ if __name__ == "__main__":
     range_flow = 0.4
     max_smooth = 10.
     start_t = datetime.now()
-    # train_lvl1()
-    # train_lvl2()
+    train_lvl1()
+    train_lvl2()
     train_lvl3()
     # time
     end_t = datetime.now()
