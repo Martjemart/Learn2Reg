@@ -184,7 +184,7 @@ def train_lvl2():
                                                                          imgshape=imgshape_4,
                                                                          range_flow=range_flow).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
+    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
     model_lvl1.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl1...", model_path)
 
@@ -214,7 +214,7 @@ def train_lvl2():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    model_dir = '../Model/Stage'
+    model_dir = './Model/Stage'
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
@@ -226,7 +226,7 @@ def train_lvl2():
     step = 0
     load_model = False
     if load_model is True:
-        model_path = "../Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
+        model_path = "./Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
         print("Loading weight: ", model_path)
         step = 3000
         model.load_state_dict(torch.load(model_path))
@@ -301,7 +301,7 @@ def train_lvl3():
                                                                          range_flow=range_flow,
                                                                          model_lvl1=model_lvl1).cuda()
 
-    model_path = sorted(glob.glob("../Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
+    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
     model_lvl2.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl2...", model_path)
 
@@ -334,7 +334,7 @@ def train_lvl3():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    model_dir = '../Model'
+    model_dir = './Model'
 
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
@@ -346,11 +346,11 @@ def train_lvl3():
     step = 0
     load_model = False
     if load_model is True:
-        model_path = "../Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
+        model_path = "./Model/LDR_LPBA_NCC_lap_share_preact_1_05_3000.pth"
         print("Loading weight: ", model_path)
         step = 3000
         model.load_state_dict(torch.load(model_path))
-        temp_lossall = np.load("../Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
+        temp_lossall = np.load("./Model/loss_LDR_LPBA_NCC_lap_share_preact_1_05_3000.npy")
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
@@ -479,10 +479,10 @@ if __name__ == "__main__":
     torch.cuda.empty_cache()
 
     # Create and initalize log file
-    if not os.path.isdir("../Log"):
-        os.mkdir("../Log")
+    if not os.path.isdir("./Log"):
+        os.mkdir("./Log")
 
-    log_dir = "../Log/" + model_name + ".txt"
+    log_dir = "./Log/" + model_name + ".txt"
 
     with open(log_dir, "a") as log:
         log.write("Validation Dice log for " + model_name[0:-1] + ":\n")
