@@ -6,7 +6,7 @@ import torch
 import torch.utils.data as Data
 import torch.nn.functional as F
 
-
+#code from the paper
 def generate_grid(imgshape):
     x = np.arange(imgshape[0])
     y = np.arange(imgshape[1])
@@ -16,6 +16,7 @@ def generate_grid(imgshape):
     grid = np.swapaxes(grid,1,2)
     return grid
 
+#code from the paper
 # (grid[0, :, :, :, 0] - (size_tensor[3] / 2)) / size_tensor[3] * 2
 def generate_grid_unit(imgshape):
     x = (np.arange(imgshape[0]) - ((imgshape[0]-1)/2)) / (imgshape[0]-1) * 2
@@ -26,7 +27,7 @@ def generate_grid_unit(imgshape):
     grid = np.swapaxes(grid,1,2)
     return grid
 
-
+#code from the paper
 def transform_unit_flow_to_flow(flow):
     x, y, z, _ = flow.shape
     flow[:, :, :, 0] = flow[:, :, :, 0] * (z-1)/2
@@ -35,7 +36,7 @@ def transform_unit_flow_to_flow(flow):
 
     return flow
 
-
+#code from the paper
 def transform_unit_flow_to_flow_2D(flow):
     x, y, _ = flow.shape
     flow[:, :, 0] = flow[:, :, 0] * (y-1)/2
@@ -43,7 +44,7 @@ def transform_unit_flow_to_flow_2D(flow):
 
     return flow
 
-
+#code from the paper
 def transform_unit_flow_to_flow_cuda(flow):
     b, x, y, z, c = flow.shape
     flow[:, :, :, :, 0] = flow[:, :, :, :, 0] * (z-1)/2
@@ -52,42 +53,23 @@ def transform_unit_flow_to_flow_cuda(flow):
 
     return flow
 
-def reshape_mask(mask, devider):
-    original_shape = mask.shape
-    mask_devided = (int(224 / devider), int(192 / devider), int(224 / devider))
-    # Reshape the mask to (batch_size, channels, height * width, depth)
-    mask_reshaped = mask.view(original_shape[0], original_shape[1], -1, original_shape[3])
-
-
-    # Calculate the stride for each dimension
-
-    # Perform max pooling with the calculated stride
-    downsampled_mask = F.avg_pool2d(mask_reshaped, kernel_size=(2,4))
-
-    threshold = 0.5
-    downsampled_mask = torch.where(downsampled_mask > threshold, torch.tensor(1.0), torch.tensor(0.0))
-
-    new_shape = (original_shape[0], original_shape[1], mask_devided[0], mask_devided[1], mask_devided[2])
-    new_shape = tuple(int(dim) for dim in new_shape)  # Convert dimensions to integers
-    final_mask = downsampled_mask.view(*new_shape)
-
-    return final_mask
-
+#reshape the mask to fit the img shape/2
 def res_mask_2(mask):
     return F.avg_pool3d(mask, kernel_size=3, stride=2, padding=1, count_include_pad=False)
-    return new_mask
 
+#reshape the mask to fit the img shape/4
 def res_mask_4(mask):
     return F.avg_pool3d(mask, kernel_size=4, stride=4)
     
+
+#load the nib img
 def load_4D(name):
-    # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
-    # X = np.reshape(X, (1,)+ X.shape)
     X = nib.load(name)
     X = X.get_fdata()
     X = np.reshape(X, (1,) + X.shape)
     return X
 
+#load keys as floats
 def load_key(name):
     keypoints = []
     with open(name, 'r', encoding='utf8') as file:
@@ -97,6 +79,7 @@ def load_key(name):
             keypoints.append(keypoint)
     return np.array(keypoints)
 
+#load keys as ints
 def load_key_x(name):
     keypoints = []
     with open(name, 'r', encoding='utf8') as file:
@@ -106,6 +89,7 @@ def load_key_x(name):
             keypoints.append(keypoint)
     return np.array(keypoints)
 
+#code from the paper
 def load_4D_with_header(name):
     # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
     # X = np.reshape(X, (1,)+ X.shape)
@@ -128,6 +112,7 @@ def imgnorm(img):
     norm_img = (img - min_v) / (max_v - min_v)
     return norm_img
 
+#code from the paper
 def save_img(I_img,savename,header=None,affine=None):
     if header is None or affine is None:
         affine = np.diag([1, 1, 1, 1])
@@ -137,7 +122,7 @@ def save_img(I_img,savename,header=None,affine=None):
 
     nib.save(new_img, savename)
 
-
+#code from the paper
 def save_img_nii(I_img,savename):
     # I2 = sitk.GetImageFromArray(I_img,isVector=False)
     # sitk.WriteImage(I2,savename)
@@ -146,7 +131,7 @@ def save_img_nii(I_img,savename):
     # save_path = os.path.join(output_path, savename)
     nib.save(new_img, savename)
 
-
+#code from the paper
 def save_flow(I_img,savename,header=None,affine=None):
     # I2 = sitk.GetImageFromArray(I_img,isVector=True)
     # sitk.WriteImage(I2,savename)
@@ -158,7 +143,7 @@ def save_flow(I_img,savename,header=None,affine=None):
 
     nib.save(new_img, savename)
 
-
+#code from the paper
 class Dataset(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, names,iterations,norm=False):
@@ -182,7 +167,7 @@ class Dataset(Data.Dataset):
         else:
             return torch.from_numpy(img_A).float(), torch.from_numpy(img_B).float()
 
-
+#loads data files
 class Dataset_epoch(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, names, norm=False):
@@ -193,6 +178,7 @@ class Dataset_epoch(Data.Dataset):
         self.norm = norm
         self.index_pair = self.generate_pairs()
 
+#save all img pairs
   def generate_pairs(self):
     pairs = []
     unique_subjects = set()
@@ -210,7 +196,7 @@ class Dataset_epoch(Data.Dataset):
   def __len__(self):
         'Denotes the total number of samples'
         return len(self.index_pair)
-
+#load file pairs
   def __getitem__(self, step):
         'Generates one sample of data'
         # Select sample
@@ -222,6 +208,7 @@ class Dataset_epoch(Data.Dataset):
         else:
             return torch.from_numpy(img_A).float(), torch.from_numpy(img_B).float()
 
+#adjusted dataset to also load masks
 class Dataset_epoch_mask(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, names, norm=False):
@@ -241,11 +228,12 @@ class Dataset_epoch_mask(Data.Dataset):
             unique_subjects.add(subject_number)
             image_0 = name
             image_1 = name.replace('_0000', '_0001')
-            mask_0 = image_0.replace('imagesTr', 'masksTr')
 
+            #include mask names
+            mask_0 = image_0.replace('imagesTr', 'masksTr')
             mask_1 = image_1.replace('imagesTr', 'masksTr')
 
-
+            #save names
             pair = (image_0, mask_0, image_1, mask_1)
             pairs.append(pair)
 
@@ -262,13 +250,15 @@ class Dataset_epoch_mask(Data.Dataset):
         img_A = load_4D(self.index_pair[step][0])
         img_B = load_4D(self.index_pair[step][2])
 
+        #load masks
         mask_A = load_4D(self.index_pair[step][1])
         mask_B = load_4D(self.index_pair[step][3])
         if self.norm:
             return torch.from_numpy(imgnorm(img_A)).float(), mask_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B
         else:
             return torch.from_numpy(img_A).float(), mask_A, torch.from_numpy(img_B).float(), mask_B
-        
+
+#adjusted dataset to also take keys (and masks)
 class Dataset_epoch_lvl3(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, names, norm=False):
@@ -324,7 +314,7 @@ class Dataset_epoch_lvl3(Data.Dataset):
         else:
             return torch.from_numpy(img_A).float(), mask_A, key_A, torch.from_numpy(img_B).float(), mask_B, key_B
 
-
+#code from the paper
 class Dataset_epoch_validation(Data.Dataset):
   'Characterizes a dataset for PyTorch'
   def __init__(self, imgs, labels, norm=False):
@@ -358,7 +348,7 @@ class Dataset_epoch_validation(Data.Dataset):
         else:
             return torch.from_numpy(img_A).float(), torch.from_numpy(img_B).float(), torch.from_numpy(label_A).float(), torch.from_numpy(label_B).float()
 
-
+#code from the paper
 class Predict_dataset(Data.Dataset):
     def __init__(self, fixed_list, move_list, fixed_label_list, move_label_list, norm=False):
         super(Predict_dataset, self).__init__()
@@ -396,7 +386,7 @@ class Predict_dataset(Data.Dataset):
                       'fixed_label': fixed_label.float(), 'move_label': moved_label.float(), 'index': index}
             return output
 
-
+#code from the paper
 if __name__ == '__main__':
     # datapath = '/home/wing/Desktop/registration/miccai2019/data_and_aseg/crop_min_max/norm'
     # names = sorted(glob.glob(datapath + '/*.nii'))[0:255]
