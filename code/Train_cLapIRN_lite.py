@@ -42,7 +42,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='NLST',
+                    default='C:/Users/Jelle/Documents/GitHub/NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
@@ -406,7 +406,7 @@ def train_lvl3():
 
     lossall = np.zeros((3, iteration_lvl3 + 1))
 
-    training_generator = Data.DataLoader(Dataset_epoch_mask(names, norm=True), batch_size=1,
+    training_generator = Data.DataLoader(Dataset_epoch_lvl3(names, norm=True), batch_size=1,
                                          shuffle=True, num_workers=2)
     step = 0
     load_model = False
@@ -427,10 +427,10 @@ def train_lvl3():
 
             F_X_Y, X_Y, Y_4x, F_xy, F_xy_lvl1, F_xy_lvl2, _ = model(X, Y, reg_code)
 
-            mask_0_re = reshape_mask(mask_0, 4).to(F_X_Y.device)
-            mask_1_re = reshape_mask(mask_1, 4).to(F_X_Y.device)
+            mask_0 = mask_0.to(F_X_Y.device)
+            mask_1 = mask_1.to(F_X_Y.device)
 
-            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
+            loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0, mask_1)
 
             _, _, x, y, z = F_X_Y.shape
             norm_vector = torch.zeros((1, 3, 1, 1, 1), dtype=F_X_Y.dtype, device=F_X_Y.device)
@@ -464,15 +464,12 @@ def train_lvl3():
 
             dist = landmarkDistance(newLM,key_1,spacingA)
 
-            print(dist)
-
-            aopdajjkfnjdsfkvgsf
-
             #keypoint_loss_weight = 0.7
 
             # Add keypoint_loss to the existing loss with a suitable weight
             smo_weight = reg_code * max_smooth
             #loss = loss_multiNCC + smo_weight * loss_regulation + keypoint_loss_weight * keypoint_loss
+
             loss = loss_multiNCC + smo_weight * loss_regulation 
             
             optimizer.zero_grad()  # clear gradients for this training step
@@ -554,8 +551,8 @@ if __name__ == "__main__":
     range_flow = 0.4
     max_smooth = 10.
     start_t = datetime.now()
-    train_lvl1()
-    train_lvl2()
+    # train_lvl1()
+    # train_lvl2()
     train_lvl3()
     # time
     end_t = datetime.now()
