@@ -421,7 +421,6 @@ def train_lvl3():
     while step <= iteration_lvl3:
         for X, mask_0, key_0, Y, mask_1, key_1, spacingA in training_generator:
 
-
             X = X.cuda().float()
             Y = Y.cuda().float()
             reg_code = torch.rand(1, dtype=X.dtype, device=X.device).unsqueeze(dim=0)
@@ -433,7 +432,6 @@ def train_lvl3():
 
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
-    
             _, _, x, y, z = F_X_Y.shape
             norm_vector = torch.zeros((1, 3, 1, 1, 1), dtype=F_X_Y.dtype, device=F_X_Y.device)
             norm_vector[0, 0, 0, 0, 0] = (z - 1)
@@ -453,7 +451,6 @@ def train_lvl3():
             d = key_1[:,:,0].unsqueeze(-1)
             h = key_1[:,:,1].unsqueeze(-1)
             w = key_1[:,:,2].unsqueeze(-1)
-
 
             key_0 = key_0.cuda()
             key_1 = key_1.cuda()
@@ -478,7 +475,6 @@ def train_lvl3():
             #loss = loss_multiNCC + smo_weight * loss_regulation + keypoint_loss_weight * keypoint_loss
             loss = loss_multiNCC + smo_weight * loss_regulation 
             
-
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
             optimizer.step()  # apply gradients
