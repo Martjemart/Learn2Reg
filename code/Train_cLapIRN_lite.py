@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from sklearn.preprocessing import normalize
 import torch.nn.functional as F
+import tqdm
 
 import numpy as np
 import torch
@@ -291,7 +292,70 @@ def train_lvl2():
     np.save(model_dir + '/loss' + model_name + 'stagelvl2.npy', lossall)
 
 def denormalization(deformation_field):
-    print(deformation_field.shape)
+    B, C, D, H, W = deformation_field.size()     
+    scale = torch.ones(deformation_field.size())
+    scale[:, 0, :, :, :] = scale[:, 0, :, :, :] * (D - 1) / 2     
+    scale[:, 1, :, :, :] = scale[:, 1, :, :, :] * (H - 1) / 2     
+    scale[:, 2, :, :, :] = scale[:, 2, :, :, :] * (W - 1) / 2      
+    deformation_conv =  deformation_field*scale.cuda()
+    return deformation_conv
+
+def trilinear_interpolate(im, x, y, z):
+    im = im.cuda()
+
+    dtype = torch.float
+
+    B, C, D, H, W = im.size()
+    x = x.type(dtype)
+    y = y.type(dtype)
+    z = z.type(dtype)
+
+    x0 = torch.floor(x).type(torch.long)
+    x1 = x0 + 1
+    y0 = torch.floor(y).type(torch.long)
+    y1 = y0 + 1
+    z0 = torch.floor(z).type(torch.long)
+    z1 = z0 + 1
+
+    w0 = torch.clamp(z0, 0, W - 1)
+    w1 = torch.clamp(z1, 0, W - 1)
+    h0 = torch.clamp(y0, 0, H - 1)
+    h1 = torch.clamp(y1, 0, H - 1)
+    d0 = torch.clamp(x0, 0, D - 1)
+    d1 = torch.clamp(x1, 0, D - 1)
+
+    # image values of neighbors
+    Ia = (im[:, :, d0, h0, w0]).to(im.device)
+    Ib = (im[:, :, d1, h0, w0]).to(im.device)
+    Ic = (im[:, :, d0, h1, w0]).to(im.device)
+    Id = (im[:, :, d1, h1, w0]).to(im.device)
+    Ie = (im[:, :, d0, h0, w1]).to(im.device)
+    If = (im[:, :, d1, h0, w1]).to(im.device)
+    Ig = (im[:, :, d0, h1, w1]).to(im.device)
+    Ih = (im[:, :, d1, h1, w1]).to(im.device)
+
+    # compute interpolation weights
+    wa = ((d1.type(dtype) - x) * (h1.type(dtype) - y) * (w1.type(dtype) - z)).to(im.device)
+    wb = ((d1.type(dtype) - x) * (h1.type(dtype) - y) * (z - w0.type(dtype))).to(im.device)
+    wc = ((d1.type(dtype) - x) * (y - h0.type(dtype)) * (w1.type(dtype) - z)).to(im.device)
+    wd = ((d1.type(dtype) - x) * (y - h0.type(dtype)) * (z - w0.type(dtype))).to(im.device)
+    we = ((x - d0.type(dtype)) * (h1.type(dtype) - y) * (w1.type(dtype) - z)).to(im.device)
+    wf = ((x - d0.type(dtype)) * (h1.type(dtype) - y) * (z - w0.type(dtype))).to(im.device)
+    wg = ((x - d0.type(dtype)) * (y - h0.type(dtype)) * (w1.type(dtype) - z)).to(im.device)
+    wh = ((x - d0.type(dtype)) * (y - h0.type(dtype)) * (z - w0.type(dtype))).to(im.device)
+
+    I_dhw = Ia * wa + Ib * wb + Ic * wc + Id * wd + Ie * we + If * wf + Ig * wg + Ih * wh
+    return I_dhw[0]
+
+def landmarkDistance(moving, fixed, voxelSpacing):
+    distance = (moving - fixed)
+    distance[:,:, 0] *= voxelSpacing[:, 0].view(-1, 1) 
+    distance[:,:, 1] *= voxelSpacing[:, 1].view(-1, 1)
+    distance[:,:, 2] *= voxelSpacing[:, 2].view(-1, 1)
+
+    dist = torch.sqrt((distance ** 2).sum(dim=2)).mean()
+    return dist
+
 
 
 def train_lvl3():
@@ -357,7 +421,7 @@ def train_lvl3():
         lossall[:, 0:3000] = temp_lossall[:, 0:3000]
 
     while step <= iteration_lvl3:
-        for X, mask_0, key_0, Y, mask_1, key_1 in training_generator:
+        for X, mask_0, key_0, Y, mask_1, key_1, spacingA in training_generator:
 
             X = X.cuda().float()
             Y = Y.cuda().float()
@@ -378,30 +442,30 @@ def train_lvl3():
             # Normalize F_X_Y to be between -1 and 1 (assuming it's not already normalized)
             norm_tensor = torch.tensor([F_X_Y.shape[-1] / 2, F_X_Y.shape[-2] / 2, F_X_Y.shape[-3] / 2])
             norm_tensor = norm_tensor.view(1, 3, 1, 1, 1).to(F_X_Y.device)
-            F_X_Y_normalized = F_X_Y / norm_tensor
-            F_X_Y_normalized = F_X_Y_normalized.permute(0, 2, 3, 4, 1)
+            F_X_Y_normalized = F_X_Y.permute(0, 2, 3, 4, 1)
             F_X_Y_normalized = F_X_Y_normalized.float()
 
-            denormalization(F_X_Y_normalized)
+            deNormalized_conv = denormalization(F_X_Y)
 
-            #Normalize key_y to [-1, 1] according to the size of the feature map
-            #key_y_normalized = key_y / torch.tensor([[x / 2, y / 2, z / 2]], dtype=key_y.dtype, device=key_y.device) - 1
-            #key_y_expanded = key_y_normalized.unsqueeze(0).unsqueeze(2).to(F_X_Y.device).float()
+            d = key_1[:,:,0].unsqueeze(-1)
+            h = key_1[:,:,1].unsqueeze(-1)
+            w = key_1[:,:,2].unsqueeze(-1)
 
-            # Now key_y_expanded is a 5D tensor where the last dimension is 3 (for the 3D coordinates), 
-            # and the rest of the dimensions match the expected input of grid_sample:
-            # [minibatch, channels=1, depth=1, height=1, width=num_keypoints]
+            key_0 = key_0.cuda()
+            key_1 = key_1.cuda()
+            spacingA = spacingA.cuda()
+            
+            deformation_atMpositions = trilinear_interpolate(deNormalized_conv, d,h,w)
 
-            # Apply the deformation field to key_y
-            #key_x_predicted = torch.nn.functional.grid_sample(key_y_expanded, F_X_Y_normalized)
+            deformation_atMpositions = torch.squeeze(deformation_atMpositions, 1)
 
-            # key_x_predicted is now a 5D tensor of shape [minibatch, channels=1, depth=1, height=1, width=num_keypoints].
-            # We can remove the singleton dimensions to match the shape of key_x:
-            #key_x_predicted = key_x_predicted.squeeze(1).squeeze(2).squeeze(2)
+            newLM = key_0 + deformation_atMpositions.permute(2,1,0)
 
-            # Now we have key_x_predicted and key_x of the same shape, 
-            # and we can compute the Euclidean distance between them for the keypoint loss:
-            #keypoint_loss = torch.norm(key_x_predicted - key_x, dim=-1).mean()
+            dist = landmarkDistance(newLM,key_1,spacingA)
+
+            print(dist)
+
+            aopdajjkfnjdsfkvgsf
 
             #keypoint_loss_weight = 0.7
 

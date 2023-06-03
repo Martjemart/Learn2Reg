@@ -84,9 +84,11 @@ def load_4D(name):
     # X = sitk.GetArrayFromImage(sitk.ReadImage(name, sitk.sitkFloat32 ))
     # X = np.reshape(X, (1,)+ X.shape)
     X = nib.load(name)
+    header_info = X.header
+    spacing = header_info['pixdim']
     X = X.get_fdata()
     X = np.reshape(X, (1,) + X.shape)
-    return X
+    return X, spacing
 
 def load_key(name):
     keypoints = []
@@ -174,8 +176,8 @@ class Dataset(Data.Dataset):
         'Generates one sample of data'
         # Select sample
         index_pair = np.random.permutation(len(self.names)) [0:2]
-        img_A = load_4D(self.names[index_pair[0]])
-        img_B = load_4D(self.names[index_pair[1]])
+        img_A, _ = load_4D(self.names[index_pair[0]])
+        img_B, _ = load_4D(self.names[index_pair[1]])
 
         if self.norm:
             return torch.from_numpy(imgnorm(img_A)).float(), torch.from_numpy(imgnorm(img_B)).float()
@@ -214,8 +216,8 @@ class Dataset_epoch(Data.Dataset):
   def __getitem__(self, step):
         'Generates one sample of data'
         # Select sample
-        img_A = load_4D(self.index_pair[step][0])
-        img_B = load_4D(self.index_pair[step][1])
+        img_A, _ = load_4D(self.index_pair[step][0])
+        img_B, _ = load_4D(self.index_pair[step][1])
 
         if self.norm:
             return torch.from_numpy(imgnorm(img_A)).float(), torch.from_numpy(imgnorm(img_B)).float()
@@ -259,11 +261,11 @@ class Dataset_epoch_mask(Data.Dataset):
   def __getitem__(self, step):
         'Generates one sample of data'
         # Select sample
-        img_A = load_4D(self.index_pair[step][0])
-        img_B = load_4D(self.index_pair[step][2])
+        img_A,_ = load_4D(self.index_pair[step][0])
+        img_B,_ = load_4D(self.index_pair[step][2])
 
-        mask_A = load_4D(self.index_pair[step][1])
-        mask_B = load_4D(self.index_pair[step][3])
+        mask_A,_ = load_4D(self.index_pair[step][1])
+        mask_B,_ = load_4D(self.index_pair[step][3])
         if self.norm:
             return torch.from_numpy(imgnorm(img_A)).float(), mask_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B
         else:
@@ -310,19 +312,19 @@ class Dataset_epoch_lvl3(Data.Dataset):
   def __getitem__(self, step):
         'Generates one sample of data'
         # Select sample
-        img_A = load_4D(self.index_pair[step][0])
-        img_B = load_4D(self.index_pair[step][3])
+        img_A, spacingA = load_4D(self.index_pair[step][0])
+        img_B,_ = load_4D(self.index_pair[step][3])
         
         key_A = load_key_x(self.index_pair[step][2])
         key_B = load_key(self.index_pair[step][5])
 
-        mask_A = load_4D(self.index_pair[step][1])
-        mask_B = load_4D(self.index_pair[step][4])
+        mask_A,_ = load_4D(self.index_pair[step][1])
+        mask_B,_ = load_4D(self.index_pair[step][4])
 
         if self.norm:
-            return torch.from_numpy(imgnorm(img_A)).float(), mask_A, key_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B, key_B
+            return torch.from_numpy(imgnorm(img_A)).float(), mask_A, key_A, torch.from_numpy(imgnorm(img_B)).float(), mask_B, key_B, spacingA
         else:
-            return torch.from_numpy(img_A).float(), mask_A, key_A, torch.from_numpy(img_B).float(), mask_B, key_B
+            return torch.from_numpy(img_A).float(), mask_A, key_A, torch.from_numpy(img_B).float(), mask_B, key_B, spacingA
 
 
 class Dataset_epoch_validation(Data.Dataset):
@@ -344,11 +346,11 @@ class Dataset_epoch_validation(Data.Dataset):
   def __getitem__(self, step):
         'Generates one sample of data'
         # Select sample
-        img_A = load_4D(self.imgs_pair[step][0])
-        img_B = load_4D(self.imgs_pair[step][1])
+        img_A,_ = load_4D(self.imgs_pair[step][0])
+        img_B,_ = load_4D(self.imgs_pair[step][1])
 
-        label_A = load_4D(self.labels_pair[step][0])
-        label_B = load_4D(self.labels_pair[step][1])
+        label_A,_ = load_4D(self.labels_pair[step][0])
+        label_B,_ = load_4D(self.labels_pair[step][1])
 
         # print(self.index_pair[step][0])
         # print(self.index_pair[step][1])
@@ -373,10 +375,10 @@ class Predict_dataset(Data.Dataset):
         return len(self.move_list)
 
     def __getitem__(self, index):
-        fixed_img = load_4D(self.fixed_list)
-        moved_img = load_4D(self.move_list[index])
-        fixed_label = load_4D(self.fixed_label_list)
-        moved_label = load_4D(self.move_label_list[index])
+        fixed_img,_ = load_4D(self.fixed_list)
+        moved_img,_ = load_4D(self.move_list[index])
+        fixed_label,_ = load_4D(self.fixed_label_list)
+        moved_label,_ = load_4D(self.move_label_list[index])
 
         if self.norm:
             fixed_img = imgnorm(fixed_img)
