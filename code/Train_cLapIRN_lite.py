@@ -23,10 +23,10 @@ parser = ArgumentParser()
 parser.add_argument("--lr", type=float,
                     dest="lr", default=1e-4, help="learning rate")
 parser.add_argument("--iteration_lvl1", type=int,
-                    dest="iteration_lvl1", default=11,
+                    dest="iteration_lvl1", default=111,
                     help="number of lvl1 iterations")
 parser.add_argument("--iteration_lvl2", type=int,
-                    dest="iteration_lvl2", default=11,
+                    dest="iteration_lvl2", default=111,
                     help="number of lvl2 iterations")
 parser.add_argument("--iteration_lvl3", type=int,
                     dest="iteration_lvl3", default=60001,
@@ -139,6 +139,9 @@ def train_lvl1():
             #calculate loss for total img + masked img
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
+            # Normalize the NCC loss based on the value of 10 million
+            normalized_loss_multiNCC = torch.where(loss_multiNCC > 10_000_000, torch.tensor(20.0), (loss_multiNCC / 10_000_000) * 19.0 + 1.0)
+
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
 
             loss_Jacobian = loss_Jdet(F_X_Y_norm, grid_4)
@@ -151,17 +154,17 @@ def train_lvl1():
             loss_regulation = loss_smooth(F_X_Y * norm_vector)
 
             smo_weight = reg_code * max_smooth
-            loss = loss_multiNCC + antifold * loss_Jacobian + smo_weight * loss_regulation
+            loss = normalized_loss_multiNCC + antifold * loss_Jacobian + smo_weight * loss_regulation
 
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
             optimizer.step()  # apply gradients
 
             lossall[:, step] = np.array(
-                [loss.item(), loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item()])
+                [loss.item(), normalized_loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item()])
             sys.stdout.write(
                 "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" - Jdet "{3:.10f}" -smo "{4:.4f} -reg_c "{5:.4f}"'.format(
-                    step, loss.item(), loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item(),
+                    step, loss.item(), normalized_loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item(),
                     reg_code[0].item()))
             sys.stdout.flush()
 
@@ -185,7 +188,7 @@ def train_lvl2():
                                                                          imgshape=imgshape_4,
                                                                          range_flow=range_flow).cuda()
 
-    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl1_??.pth"))[-1]
+    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl1_???.pth"))[-1]
     model_lvl1.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl1...", model_path)
 
@@ -249,6 +252,10 @@ def train_lvl2():
             #calculate loss for total img + masked img
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
+            # Normalize the NCC loss based on the value of 10 million
+            normalized_loss_multiNCC = torch.where(loss_multiNCC > 10_000_000, torch.tensor(20.0), (loss_multiNCC / 10_000_000) * 19.0 + 1.0)
+
+
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
 
             loss_Jacobian = loss_Jdet(F_X_Y_norm, grid_2)
@@ -261,17 +268,17 @@ def train_lvl2():
             loss_regulation = loss_smooth(F_X_Y * norm_vector)
 
             smo_weight = reg_code * max_smooth
-            loss = loss_multiNCC + antifold * loss_Jacobian + smo_weight * loss_regulation
+            loss = normalized_loss_multiNCC + antifold * loss_Jacobian + smo_weight * loss_regulation
 
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
             optimizer.step()  # apply gradients
 
             lossall[:, step] = np.array(
-                [loss.item(), loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item()])
+                [loss.item(), normalized_loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item()])
             sys.stdout.write(
                 "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" - Jdet "{3:.10f}" -smo "{4:.4f} -reg_c "{5:.4f}"'.format(
-                    step, loss.item(), loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item(),
+                    step, loss.item(), normalized_loss_multiNCC.item(), loss_Jacobian.item(), loss_regulation.item(),
                     reg_code[0].item()))
             sys.stdout.flush()
 
@@ -366,7 +373,7 @@ def train_lvl3():
                                                                          range_flow=range_flow,
                                                                          model_lvl1=model_lvl1).cuda()
 
-    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl2_??.pth"))[-1]
+    model_path = sorted(glob.glob("./Model/Stage/" + model_name + "stagelvl2_???.pth"))[-1]
     model_lvl2.load_state_dict(torch.load(model_path))
     print("Loading weight for model_lvl2...", model_path)
 
@@ -430,7 +437,11 @@ def train_lvl3():
             mask_0 = mask_0.to(F_X_Y.device)
             mask_1 = mask_1.to(F_X_Y.device)
 
+            # Inside the training loop
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0, mask_1)
+
+            # Normalize the NCC loss based on the value of 10 million
+            normalized_loss_multiNCC = torch.where(loss_multiNCC > 10_000_000, torch.tensor(20.0), (loss_multiNCC / 10_000_000) * 19.0 + 1.0)
 
             _, _, x, y, z = F_X_Y.shape
             norm_vector = torch.zeros((1, 3, 1, 1, 1), dtype=F_X_Y.dtype, device=F_X_Y.device)
@@ -464,24 +475,22 @@ def train_lvl3():
 
             dist = landmarkDistance(newLM,key_1,spacingA)
 
-            #keypoint_loss_weight = 0.7
-
             # Add keypoint_loss to the existing loss with a suitable weight
             smo_weight = reg_code * max_smooth
             #loss = loss_multiNCC + smo_weight * loss_regulation + keypoint_loss_weight * keypoint_loss
 
-            loss = loss_multiNCC + smo_weight * loss_regulation 
+            loss = normalized_loss_multiNCC + smo_weight * loss_regulation + dist
             
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
             optimizer.step()  # apply gradients
 
             lossall[:, step] = np.array(
-                [loss.item(), loss_multiNCC.item(), loss_regulation.item()])
+                [loss.item(), normalized_loss_multiNCC.item(), loss_regulation.item()])
             sys.stdout.write(
-                "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" -smo "{3:.4f} -reg_c "{4:.4f}"'.format(
-                    step, loss.item(), loss_multiNCC.item(), loss_regulation.item(),
-                    reg_code[0].item()))
+                "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" -smo "{3:.4f} -reg_c "{4:.4f}" -dist "{5:.4f}"'.format(
+                    step, loss.item(), normalized_loss_multiNCC.item(), loss_regulation.item(),
+                    reg_code[0].item(), dist.item()))
             sys.stdout.flush()
 
             # with lr 1e-3 + with bias
@@ -551,8 +560,8 @@ if __name__ == "__main__":
     range_flow = 0.4
     max_smooth = 10.
     start_t = datetime.now()
-    # train_lvl1()
-    # train_lvl2()
+    train_lvl1()
+    train_lvl2()
     train_lvl3()
     # time
     end_t = datetime.now()

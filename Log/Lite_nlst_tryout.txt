@@ -106,3 +106,136 @@ Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
 Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+20:nan
+30:nan
+40:nan
+50:nan
+60:nan
+70:nan
+80:nan
+90:nan
+100:nan
+110:nan
+120:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+20:nan
+30:nan
+40:nan
+50:nan
+60:nan
+70:nan
+80:nan
+90:nan
+100:nan
+110:nan
+120:nan
+130:nan
+140:nan
+150:nan
+160:nan
+170:nan
+180:nan
+190:nan
+200:nan
+210:nan
+220:nan
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+20:nan
+30:nan
+40:nan
+50:nan
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+20:nan
+30:nan
+40:nan
+50:nan
+60:nan
+70:nan
+80:nan
+Validation Dice log for Lite_nlst_tryou:
+0:nan
+10:nan
+20:nan
+30:nan
+40:nan
+50:nan
+60:nan
+70:nan
+80:nan
+90:nan
+100:nan
+110:nan
+120:nan
+130:nan
+140:nan
+150:nan
+160:nan
+170:nan
+180:nan
+190:nan
+200:nan
+210:nan
+220:nan
+230:nan
+240:nan
+250:nan
+260:nan
+270:nan
+280:nan
+290:nan
+300:nan
+310:nan
+320:nan
+330:nan
+340:nan
+350:nan
+360:nan
+370:nan
+380:nan
+390:nan
+400:nan
+410:nan
+420:nan
+430:nan
+440:nan
+450:nan
+460:nan
+470:nan
+480:nan
+490:nan
+500:nan
