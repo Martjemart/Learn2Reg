@@ -140,7 +140,7 @@ def train_lvl1():
             loss_multiNCC = loss_similarity(X_Y, Y_4x, mask_0_re, mask_1_re)
 
             # Normalize the NCC loss based on the value of 10 million
-            normalized_loss_multiNCC = torch.where(loss_multiNCC > 10_000_000, torch.tensor(20.0), (loss_multiNCC / 10_000_000) * 19.0 + 1.0)
+            normalized_loss_multiNCC = torch.where(loss_multiNCC > 10_000_000, torch.tensor(20.0), (loss_multiNCC / 10_000_000) * 20)
 
             F_X_Y_norm = transform_unit_flow_to_flow_cuda(F_X_Y.permute(0, 2, 3, 4, 1).clone())
 
