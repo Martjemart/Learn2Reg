@@ -5,7 +5,6 @@ from argparse import ArgumentParser
 from datetime import datetime
 from sklearn.preprocessing import normalize
 import torch.nn.functional as F
-import tqdm
 
 import numpy as np
 import torch
@@ -29,7 +28,7 @@ parser.add_argument("--iteration_lvl2", type=int,
                     dest="iteration_lvl2", default=111,
                     help="number of lvl2 iterations")
 parser.add_argument("--iteration_lvl3", type=int,
-                    dest="iteration_lvl3", default=60001,
+                    dest="iteration_lvl3", default=200,
                     help="number of lvl3 iterations")
 parser.add_argument("--antifold", type=float,
                     dest="antifold", default=1.,
@@ -42,7 +41,7 @@ parser.add_argument("--start_channel", type=int,
                     help="number of start channels")
 parser.add_argument("--datapath", type=str,
                     dest="datapath",
-                    default='C:/Users/Jelle/Documents/GitHub/NLST',
+                    default='NLST',
                     help="data path for training images")
 parser.add_argument("--freeze_step", type=int,
                     dest="freeze_step", default=3000,
