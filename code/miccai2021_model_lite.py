@@ -526,7 +526,7 @@ class NCC(torch.nn.Module):
     """
     local (over window) normalized cross correlation
     """
-    def __init__(self, win=5, eps=1e-8):
+    def __init__(self, win=3, eps=1e-8): 
         super(NCC, self).__init__()
         self.win = win
         self.eps = eps
@@ -588,7 +588,7 @@ class NCC(torch.nn.Module):
         cc_mask = cross_msk * cross_msk / (I_var_msk * J_var_msk + self.eps)
 
         # return negative cc.
-        return -1.0 * torch.mean(cc+cc_mask*2)
+        return torch.mean(cc+cc_mask*2)
 
 
 class multi_resolution_NCC(torch.nn.Module):
@@ -607,18 +607,11 @@ class multi_resolution_NCC(torch.nn.Module):
             # self.similarity_metric.append(Normalized_Gradient_Field(eps=0.01))
 
     def forward(self, I, J, mask_i, mask_j):
+        # Convert mask_i and mask_j to float
+        mask_i = mask_i.float()
+        mask_j = mask_j.float()
+
         total_NCC = []
-        # scale_I = I
-        # scale_J = J
-        #
-        # for i in range(self.num_scale):
-        #     current_NCC = similarity_metric(scale_I,scale_J)
-        #     # print("Scale ", i, ": ", current_NCC, (2**i))
-        #     total_NCC += current_NCC/(2**i)
-        #     # print(scale_I.size(), scale_J.size())
-        #     # print(current_NCC)
-        #     scale_I = nn.functional.interpolate(I, scale_factor=(1.0/(2**(i+1))))
-        #     scale_J = nn.functional.interpolate(J, scale_factor=(1.0/(2**(i+1))))
 
         for i in range(self.num_scale):
             current_NCC = self.similarity_metric[i](I, J, mask_i, mask_j)
