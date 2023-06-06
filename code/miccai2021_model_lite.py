@@ -550,7 +550,7 @@ class NCC(torch.nn.Module):
         I2 = I*I
         J2 = J*J
         IJ = I*J
-        IJ_mask = (I *mask_i) * (J * mask_j)
+        #IJ_mask = (I *mask_i) * (J * mask_j)
 
         # compute filters
         # compute local sums via convolution
@@ -562,9 +562,9 @@ class NCC(torch.nn.Module):
 
         I_mask = I_sum * mask_i
         J_mask = J_sum * mask_j
-        I2_sum_mask = conv_fn(I2, weight, padding=int(win_size/2))* mask_i
-        J2_sum_mask = conv_fn(J2, weight, padding=int(win_size/2))* mask_j
-        IJ_sum_mask = conv_fn(IJ_mask.float(), weight, padding=int(win_size/2))
+        #I2_sum_mask = conv_fn(I2, weight, padding=int(win_size/2))* mask_i
+        #J2_sum_mask = conv_fn(J2, weight, padding=int(win_size/2))* mask_j
+        #IJ_sum_mask = conv_fn(IJ_mask.float(), weight, padding=int(win_size/2))
 
         # compute cross correlation
         win_size = np.prod(self.win)
@@ -577,18 +577,18 @@ class NCC(torch.nn.Module):
 
         # compute cross correlation
         win_size = np.prod(self.win)
-        u_I_mask = I_mask/win_size
-        u_J_mask = J_mask/win_size
+        #u_I_mask = I_mask/win_size
+        #u_J_mask = J_mask/win_size
 
-        cross_msk = IJ_sum_mask - u_J_mask*I_mask - u_I_mask*J_mask + u_I_mask*u_J_mask*win_size
-        I_var_msk = I2_sum_mask - 2 * u_I_mask * I_mask + u_I_mask*u_I_mask*win_size
-        J_var_msk = J2_sum_mask - 2 * u_J_mask * J_mask+ u_J_mask*u_J_mask*win_size
+        #cross_msk = IJ_sum_mask - u_J_mask*I_mask - u_I_mask*J_mask + u_I_mask*u_J_mask*win_size
+        #I_var_msk = I2_sum_mask - 2 * u_I_mask * I_mask + u_I_mask*u_I_mask*win_size
+        #J_var_msk = J2_sum_mask - 2 * u_J_mask * J_mask+ u_J_mask*u_J_mask*win_size
 
         cc = cross * cross / (I_var * J_var + self.eps)
-        cc_mask = cross_msk * cross_msk / (I_var_msk * J_var_msk + self.eps)
+        #cc_mask = cross_msk * cross_msk / (I_var_msk * J_var_msk + self.eps)
 
         # return negative cc.
-        return torch.mean(cc+cc_mask*2)
+        return torch.mean(cc)
 
 
 class multi_resolution_NCC(torch.nn.Module):

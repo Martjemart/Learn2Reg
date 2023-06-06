@@ -472,13 +472,13 @@ def train_lvl3():
 
             newLM = key_0 + deformation_atMpositions.permute(2,1,0)
 
-            dist = landmarkDistance(newLM,key_1,spacingA)
+            #dist = landmarkDistance(newLM,key_1,spacingA)
 
             # Add keypoint_loss to the existing loss with a suitable weight
             smo_weight = reg_code * max_smooth
             #loss = loss_multiNCC + smo_weight * loss_regulation + keypoint_loss_weight * keypoint_loss
 
-            loss = normalized_loss_multiNCC + smo_weight * loss_regulation + dist
+            loss = normalized_loss_multiNCC + smo_weight * loss_regulation # + dist
             
             optimizer.zero_grad()  # clear gradients for this training step
             loss.backward()  # backpropagation, compute gradients
