@@ -487,9 +487,9 @@ def train_lvl3():
             lossall[:, step] = np.array(
                 [loss.item(), normalized_loss_multiNCC.item(), loss_regulation.item()])
             sys.stdout.write(
-                "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" -smo "{3:.4f} -reg_c "{4:.4f}" -dist "{5:.4f}"'.format(
+                "\r" + 'step "{0}" -> training loss "{1:.4f}" - sim_NCC "{2:4f}" -smo "{3:.4f} -reg_c "{4:.4f}"'.format(
                     step, loss.item(), normalized_loss_multiNCC.item(), loss_regulation.item(),
-                    reg_code[0].item(), dist.item()))
+                    reg_code[0].item()))
             sys.stdout.flush()
 
             # with lr 1e-3 + with bias
